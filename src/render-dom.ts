@@ -74,7 +74,7 @@ export function createDomAd(
     elNode.style.transition = "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
     elNode.style.display = "flex";
     elNode.style.alignItems = "center";
-    elNode.style.justifyContent = "center";
+    elNode.style.justifyContent = layout.layoutMode === "horizontal-split" && box.type === "text" ? "flex-start" : "center";
 
     if (options.showBoundingBoxes) {
       elNode.style.outline = "1px solid rgba(236, 72, 153, 0.6)";
@@ -95,14 +95,14 @@ export function createDomAd(
     } else if (box.type === "text") {
       const textSpec = elSpec as TextElementSpec;
       const p = document.createElement("div");
-      p.innerText = textSpec.content;
+      const lines = box.textLines && box.textLines.length > 0 ? box.textLines : [textSpec.content];
+      p.innerHTML = lines.join("<br/>");
       p.style.fontSize = `${box.fontSize}px`;
-      p.style.lineHeight = `${box.lineHeight || 1.3}px`;
+      p.style.lineHeight = `${box.lineHeight || Math.round((box.fontSize || 16) * 1.25)}px`;
       p.style.fontWeight = textSpec.weight === "black" ? "900" : textSpec.weight === "bold" ? "700" : "500";
       p.style.color = textSpec.role === "primary" ? "#ffffff" : "#94a3b8";
       p.style.textAlign = layout.layoutMode === "horizontal-split" ? "left" : "center";
       p.style.overflow = "hidden";
-      p.style.textOverflow = "ellipsis";
       p.style.width = "100%";
       elNode.appendChild(p);
     } else if (box.type === "button") {
@@ -230,18 +230,20 @@ export const AdDomRenderer: React.FC<{
       }
     } else if (box.type === "text") {
       const textSpec = elSpec as TextElementSpec;
-      const textContent = box.truncated
-        ? textSpec.content.split("•")[0]?.trim() || textSpec.content
-        : textSpec.content;
+      const lines = box.textLines && box.textLines.length > 0 ? box.textLines : [
+        box.truncated
+          ? textSpec.content.split("•")[0]?.trim() || textSpec.content
+          : textSpec.content
+      ];
 
-      elementChildren.push(
+      const lineNodes = lines.map((line, lIdx) =>
         React.createElement(
           "p",
           {
-            key: "p",
+            key: `line-${lIdx}`,
             style: {
               fontSize: `${box.fontSize}px`,
-              lineHeight: `${box.lineHeight || Math.round((box.fontSize || 16) * 1.3)}px`,
+              lineHeight: `${box.lineHeight || Math.round((box.fontSize || 16) * 1.25)}px`,
               fontWeight:
                 textSpec.weight === "black" ? 900 : textSpec.weight === "bold" ? 700 : 500,
             },
@@ -251,22 +253,32 @@ export const AdDomRenderer: React.FC<{
                 : "text-indigo-200/90 font-medium"
             }`,
           },
-          textContent
+          line
         )
       );
 
-      if (box.truncated) {
-        elementChildren.push(
-          React.createElement(
-            "span",
-            {
-              key: "badge-condensed",
-              className: "inline-block mt-0.5 rounded bg-amber-500/80 px-1 text-[8px] font-semibold text-slate-950 uppercase",
-            },
-            "Condensed"
-          )
-        );
-      }
+      elementChildren.push(
+        React.createElement(
+          "div",
+          {
+            key: "text-wrapper",
+            className: `w-full overflow-hidden ${
+              layout.layoutMode === "horizontal-split" ? "text-left" : "text-center"
+            }`,
+          },
+          lineNodes,
+          box.truncated
+            ? React.createElement(
+                "span",
+                {
+                  key: "badge-condensed",
+                  className: "inline-block mt-0.5 rounded bg-amber-500/80 px-1 text-[8px] font-semibold text-slate-950 uppercase",
+                },
+                "Condensed"
+              )
+            : null
+        )
+      );
     } else if (box.type === "button") {
       const btnSpec = elSpec as ButtonElementSpec;
       const btnInner: React.ReactNode[] = [
@@ -333,7 +345,7 @@ export const AdDomRenderer: React.FC<{
             top: `${box.y}px`,
             width: `${box.width}px`,
             height: `${box.height}px`,
-            transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
             zIndex: box.type === "button" ? 20 : 10,
           },
           className: boxClasses,
@@ -363,11 +375,11 @@ export const AdDomRenderer: React.FC<{
     "div",
     {
       style: {
-        width: layout.surfaceWidth * scale,
-        height: layout.surfaceHeight * scale,
+        width: Math.round(layout.surfaceWidth * scale),
+        height: Math.round(layout.surfaceHeight * scale),
         position: "relative",
         transformOrigin: "top left",
-        transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1), height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "width 0.35s cubic-bezier(0.16, 1, 0.3, 1), height 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
       },
       className:
         "relative select-none overflow-hidden rounded-xl shadow-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 border border-slate-800/80",

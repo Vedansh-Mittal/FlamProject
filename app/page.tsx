@@ -32,8 +32,8 @@ export default function AdaptiveLayoutDashboard() {
   const [selectedSurfaceKey, setSelectedSurfaceKey] = useState<string>("mobilePortrait");
 
   // Custom surface parameters
-  const [customWidth, setCustomWidth] = useState<number>(360);
-  const [customHeight, setCustomHeight] = useState<number>(420);
+  const [customWidth, setCustomWidth] = useState<number>(480);
+  const [customHeight, setCustomHeight] = useState<number>(360);
   const [customDistance, setCustomDistance] = useState<"near" | "medium" | "far">("near");
   const [customTouchOnly, setCustomTouchOnly] = useState<boolean>(true);
 
@@ -56,6 +56,7 @@ export default function AdaptiveLayoutDashboard() {
 
   // Canvas ref for canvas renderer
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stageContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Compute active surface profile based on selection and space degradation
   const activeSurface: SurfaceProfile = useMemo(() => {
@@ -96,14 +97,20 @@ export default function AdaptiveLayoutDashboard() {
     return resolveLayout(defaultAdSpec, activeSurface);
   }, [activeSurface]);
 
-  // Auto-fit zoom based on surface dimensions
-  useEffect(() => {
-    const maxPreviewW = 680;
-    const maxPreviewH = 460;
-    const fitW = maxPreviewW / activeSurface.width;
-    const fitH = maxPreviewH / activeSurface.height;
+  // Auto-fit zoom based on container dimensions and surface size
+  const autoFitZoom = () => {
+    const containerW = stageContainerRef.current?.clientWidth || 640;
+    const containerH = stageContainerRef.current?.clientHeight || 460;
+    const availableW = Math.max(200, containerW - 48);
+    const availableH = Math.max(160, containerH - 48);
+    const fitW = availableW / activeSurface.width;
+    const fitH = availableH / activeSurface.height;
     const optimal = Math.min(1.0, Math.min(fitW, fitH));
-    setPreviewZoom(Math.max(0.2, Math.round(optimal * 100) / 100));
+    setPreviewZoom(Math.max(0.12, Math.round(optimal * 100) / 100));
+  };
+
+  useEffect(() => {
+    autoFitZoom();
   }, [activeSurface.width, activeSurface.height]);
 
   // Render to canvas if canvas mode is chosen
@@ -479,7 +486,10 @@ export default function AdaptiveLayoutDashboard() {
             </div>
 
             {/* Viewport Frame with Zoom */}
-            <div className="relative flex min-h-[480px] flex-1 items-center justify-center overflow-auto rounded-xl bg-slate-950/80 p-6 border border-slate-900 shadow-inner">
+            <div
+              ref={stageContainerRef}
+              className="relative flex min-h-[480px] flex-1 items-center justify-center overflow-hidden rounded-xl bg-slate-950/80 p-6 border border-slate-900 shadow-inner"
+            >
               {rendererMode === "dom" ? (
                 <AdDomRenderer
                   layout={resolvedLayout}
@@ -494,13 +504,27 @@ export default function AdaptiveLayoutDashboard() {
               ) : (
                 <div
                   style={{
-                    transform: `scale(${previewZoom})`,
-                    transformOrigin: "center center",
-                    transition: "all 0.3s ease",
+                    width: Math.round(activeSurface.width * previewZoom),
+                    height: Math.round(activeSurface.height * previewZoom),
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "width 0.35s ease, height 0.35s ease",
                   }}
-                  className="rounded-xl overflow-hidden shadow-2xl border border-slate-800"
+                  className="relative select-none rounded-xl shadow-2xl border border-slate-800 bg-slate-950"
                 >
-                  <canvas ref={canvasRef} />
+                  <div
+                    style={{
+                      width: activeSurface.width,
+                      height: activeSurface.height,
+                      transform: `scale(${previewZoom})`,
+                      transformOrigin: "top left",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                  >
+                    <canvas ref={canvasRef} />
+                  </div>
                 </div>
               )}
             </div>
@@ -528,14 +552,22 @@ export default function AdaptiveLayoutDashboard() {
                 <span>Scale:</span>
                 <input
                   type="range"
-                  min="0.15"
+                  min="0.1"
                   max="1.5"
-                  step="0.05"
+                  step="0.02"
                   value={previewZoom}
                   onChange={(e) => setPreviewZoom(Number(e.target.value))}
                   className="w-24 accent-indigo-500"
                 />
                 <span className="font-mono text-slate-300 w-10 text-right">{Math.round(previewZoom * 100)}%</span>
+                <button
+                  type="button"
+                  onClick={autoFitZoom}
+                  className="p-1 rounded bg-slate-800 text-slate-300 hover:text-white ml-1"
+                  title="Fit to stage"
+                >
+                  <Maximize2 className="h-3 w-3" />
+                </button>
               </div>
             </div>
           </section>
